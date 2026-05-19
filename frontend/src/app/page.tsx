@@ -15,6 +15,14 @@ export default function HomePage() {
         >
           Sign in
         </Link>
+        <div>
+          <Link
+            href="/about"
+            className="text-sm text-zinc-500 underline hover:text-zinc-900"
+          >
+            About
+          </Link>
+        </div>
       </div>
     </main>
   );
