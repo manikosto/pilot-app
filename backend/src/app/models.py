@@ -27,6 +27,11 @@ class LoginResponse(BaseModel):
     user: User
 
 
+class VersionResponse(BaseModel):
+    version: str
+    name: str
+
+
 # In-memory user store used by the demo endpoints. The agent is free to
 # replace this with a proper data layer when the spec requires it.
 SEED_USERS: ClassVar[list[User]] = [

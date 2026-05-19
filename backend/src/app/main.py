@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models import LoginRequest, LoginResponse, SEED_USERS, User
+from app.models import LoginRequest, LoginResponse, SEED_USERS, User, VersionResponse
 
 app = FastAPI(title="pilot-app", version="0.1.0")
 app.add_middleware(
@@ -19,6 +19,11 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/version", response_model=VersionResponse, tags=["meta"])
+async def version() -> VersionResponse:
+    return VersionResponse(version="0.1.0", name="pilot-app")
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
