@@ -7,6 +7,7 @@ from app.main import app
 from app.models import SEED_USERS
 
 client = TestClient(app)
+authed_client = TestClient(app, headers={"Authorization": "Bearer demo-token"})
 
 
 # ---------------------------------------------------------------------------
@@ -16,28 +17,28 @@ client = TestClient(app)
 
 def test_me_returns_200():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert res.status_code == 200
 
 
 def test_me_body_contains_only_id():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert — keys must be exactly {"id"}; name and email must be absent
     assert set(res.json().keys()) == {"id"}
 
 
 def test_me_body_exact_shape():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert res.json() == {"id": SEED_USERS[0].id}
 
 
 def test_me_id_is_integer():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert isinstance(res.json()["id"], int)
 
@@ -45,7 +46,7 @@ def test_me_id_is_integer():
 # Edge: name field must be absent
 def test_me_name_field_absent():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert "name" not in res.json()
 
@@ -53,7 +54,7 @@ def test_me_name_field_absent():
 # Edge: email field must be absent
 def test_me_email_field_absent():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert "email" not in res.json()
 
@@ -61,7 +62,7 @@ def test_me_email_field_absent():
 # Edge: id must be a positive integer (boundary — zero/negative are invalid user ids)
 def test_me_id_is_positive():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert res.json()["id"] > 0
 
@@ -69,7 +70,7 @@ def test_me_id_is_positive():
 # Edge: response must be a JSON object, not a list or scalar
 def test_me_response_is_object():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert isinstance(res.json(), dict)
 
@@ -77,7 +78,7 @@ def test_me_response_is_object():
 # Edge: Content-Type header must indicate JSON
 def test_me_response_content_type_is_json():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert "application/json" in res.headers["content-type"]
 
@@ -90,7 +91,7 @@ def test_me_id_matches_first_seed_user():
     # Arrange
     expected_id = SEED_USERS[0].id
     # Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert res.json()["id"] == expected_id
 
@@ -98,8 +99,8 @@ def test_me_id_matches_first_seed_user():
 # Edge: calling endpoint twice returns the same id (idempotency)
 def test_me_id_is_stable_across_calls():
     # Arrange / Act
-    first = client.get("/api/users/me").json()["id"]
-    second = client.get("/api/users/me").json()["id"]
+    first = authed_client.get("/api/users/me").json()["id"]
+    second = authed_client.get("/api/users/me").json()["id"]
     # Assert
     assert first == second
 
@@ -107,16 +108,13 @@ def test_me_id_is_stable_across_calls():
 # Edge: id is not None / null
 def test_me_id_is_not_none():
     # Arrange / Act
-    res = client.get("/api/users/me")
+    res = authed_client.get("/api/users/me")
     # Assert
     assert res.json()["id"] is not None
 
 
 # ---------------------------------------------------------------------------
 # Scenario 4: unauthenticated GET → 401 and no user data in body
-# NOTE: The demo app currently has no auth enforcement on this endpoint, so
-#       these tests are expected to FAIL. They document the spec requirement
-#       that is not yet implemented.
 # ---------------------------------------------------------------------------
 
 def test_me_unauthenticated_no_token_returns_401():
