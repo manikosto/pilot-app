@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models import LoginRequest, LoginResponse, SEED_USERS, User
+from app.models import LoginRequest, LoginResponse, SEED_USERS, User, UserPublic
 
 app = FastAPI(title="pilot-app", version="0.1.0")
 app.add_middleware(
@@ -29,6 +29,11 @@ async def login(payload: LoginRequest) -> LoginResponse:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
     return LoginResponse(token="demo-token", user=user)
+
+
+@app.get("/api/users", response_model=list[UserPublic])
+async def list_users() -> list[UserPublic]:
+    return [UserPublic(id=u.id, email=u.email, name=u.name) for u in SEED_USERS]
 
 
 @app.get("/api/users/me", response_model=User)
