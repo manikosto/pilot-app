@@ -31,6 +31,11 @@ async def login(payload: LoginRequest) -> LoginResponse:
     return LoginResponse(token="demo-token", user=user)
 
 
+@app.get("/api/users/count")
+async def users_count() -> dict[str, int]:
+    return {"count": len(SEED_USERS)}
+
+
 @app.get("/api/users/me", response_model=User)
 async def me() -> User:
     return SEED_USERS[0]
