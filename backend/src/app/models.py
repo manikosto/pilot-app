@@ -17,6 +17,10 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class UserMeResponse(BaseModel):
+    id: int
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1)
