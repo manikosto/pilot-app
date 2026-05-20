@@ -32,12 +32,18 @@ pilot-app/
 ```bash
 # backend
 cd backend && python3.12 -m venv .venv && .venv/bin/pip install -e .
-.venv/bin/uvicorn app.main:app --reload --port 8001
+.venv/bin/uvicorn app.main:app --reload --port 8002
 
 # frontend (separate terminal)
-cd frontend && npm install && npm run dev
+cd frontend && npm install
+NEXT_PUBLIC_API_BASE=http://localhost:8002 npm run dev
 # → http://localhost:3010
 ```
+
+The frontend reads the API base URL from `NEXT_PUBLIC_API_BASE` (defaults to
+`http://localhost:8001` when the env var is unset, matching the original
+README). Pick a port that's free on your machine — on the canonical dev
+setup `8001` is taken by another service, so we use `8002`.
 
 ## Pipeline integration
 

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -10,7 +13,7 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("…");
-    const res = await fetch("http://localhost:8001/api/auth/login", {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
