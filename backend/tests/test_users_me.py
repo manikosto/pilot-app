@@ -179,3 +179,37 @@ def test_me_patch_not_allowed():
     res = client.patch("/api/users/me")
     # Assert
     assert res.status_code == 405
+
+
+# ---------------------------------------------------------------------------
+# Edge cases: malformed / wrong-scheme Authorization headers → 401
+# ---------------------------------------------------------------------------
+
+# Edge: Basic auth scheme instead of Bearer → 401
+def test_me_basic_auth_scheme_returns_401():
+    # Arrange
+    headers = {"Authorization": "Basic demo-token"}
+    # Act
+    res = client.get("/api/users/me", headers=headers)
+    # Assert
+    assert res.status_code == 401
+
+
+# Edge: "Bearer" with no trailing space or token → 401
+def test_me_bearer_prefix_only_returns_401():
+    # Arrange — sends exactly "Bearer" with no space or token after it
+    headers = {"Authorization": "Bearer"}
+    # Act
+    res = client.get("/api/users/me", headers=headers)
+    # Assert
+    assert res.status_code == 401
+
+
+# Edge: empty bearer value ("Bearer ") is not in token map → 401
+def test_me_empty_bearer_value_returns_401():
+    # Arrange
+    headers = {"Authorization": "Bearer "}
+    # Act
+    res = client.get("/api/users/me", headers=headers)
+    # Assert
+    assert res.status_code == 401
