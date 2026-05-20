@@ -17,6 +17,9 @@ from app.models import (
     NoteUpdate,
     SEED_NOTES,
     SEED_USERS,
+    Task,
+    TaskCreate,
+    TaskUpdate,
     User,
 )
 
@@ -36,6 +39,8 @@ app.add_middleware(
 _NOTES: dict[int, Note] = {n.id: n.model_copy() for n in SEED_NOTES}
 _NEXT_NOTE_ID = max(_NOTES.keys(), default=0) + 1
 _TOKENS: dict[str, int] = {}  # token → user_id
+_TASKS: dict[int, Task] = {}
+_NEXT_TASK_ID = 1
 
 
 def _utcnow() -> datetime:
@@ -178,3 +183,74 @@ async def delete_note(note_id: int, user: CurrentUser) -> None:
             status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
         )
     _NOTES.pop(note_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/tasks", response_model=list[Task])
+async def list_tasks(user: CurrentUser) -> list[Task]:
+    tasks = [t for t in _TASKS.values() if t.user_id == user.id]
+    tasks.sort(key=lambda t: t.created_at.timestamp())
+    return tasks
+
+
+@app.post(
+    "/api/tasks",
+    response_model=Task,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_task(payload: TaskCreate, user: CurrentUser) -> Task:
+    global _NEXT_TASK_ID
+    task = Task(
+        id=_NEXT_TASK_ID,
+        user_id=user.id,
+        title=payload.title,
+        description=payload.description,
+    )
+    _TASKS[task.id] = task
+    _NEXT_TASK_ID += 1
+    return task
+
+
+@app.get("/api/tasks/{task_id}", response_model=Task)
+async def get_task(task_id: int, user: CurrentUser) -> Task:
+    task = _TASKS.get(task_id)
+    if task is None or task.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    return task
+
+
+@app.patch("/api/tasks/{task_id}", response_model=Task)
+async def update_task(
+    task_id: int, payload: TaskUpdate, user: CurrentUser
+) -> Task:
+    task = _TASKS.get(task_id)
+    if task is None or task.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    update_fields = payload.model_dump(exclude_unset=True)
+    # title cannot be cleared; drop it if explicitly sent as null
+    if update_fields.get("title") is None:
+        update_fields.pop("title", None)
+    data = task.model_dump()
+    data.update(update_fields)
+    data["updated_at"] = _utcnow()
+    updated = Task.model_validate(data)
+    _TASKS[task_id] = updated
+    return updated
+
+
+@app.delete("/api/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(task_id: int, user: CurrentUser) -> None:
+    task = _TASKS.get(task_id)
+    if task is None or task.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    _TASKS.pop(task_id, None)

@@ -26,6 +26,15 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface Task {
+  id: number;
+  user_id: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(TOKEN_KEY);
@@ -98,4 +107,18 @@ export const api = {
     }),
   deleteNote: (id: number) =>
     request<void>(`/api/notes/${id}`, { method: "DELETE" }),
+  listTasks: () => request<Task[]>("/api/tasks"),
+  createTask: (body: { title: string; description?: string | null }) =>
+    request<Task>("/api/tasks", { method: "POST", body: JSON.stringify(body) }),
+  getTask: (id: number) => request<Task>(`/api/tasks/${id}`),
+  updateTask: (
+    id: number,
+    body: { title?: string; description?: string | null },
+  ) =>
+    request<Task>(`/api/tasks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteTask: (id: number) =>
+    request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
 };

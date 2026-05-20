@@ -55,6 +55,27 @@ class NoteUpdate(BaseModel):
     pinned: bool | None = None
 
 
+class Task(BaseModel):
+    """A user's task."""
+
+    id: int
+    user_id: int
+    title: str
+    description: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+
+
 # In-memory user store used by the demo endpoints. The agent is free to
 # replace this with a proper data layer when the spec requires it.
 SEED_USERS: ClassVar[list[User]] = [
