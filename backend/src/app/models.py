@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
+from enum import Enum
 from typing import ClassVar
 
 from pydantic import BaseModel, EmailStr, Field
@@ -55,6 +57,52 @@ class NoteUpdate(BaseModel):
     pinned: bool | None = None
 
 
+class TaskStatus(str, Enum):
+    todo = "todo"
+    in_progress = "in_progress"
+    done = "done"
+
+
+class TaskPriority(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class Task(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    status: TaskStatus = TaskStatus.todo
+    priority: TaskPriority = TaskPriority.medium
+    assignee_id: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    description: str | None = None
+    status: TaskStatus = TaskStatus.todo
+    priority: TaskPriority = TaskPriority.medium
+    assignee_id: str | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: str | None = None
+    status: TaskStatus | None = None
+    priority: TaskPriority | None = None
+    assignee_id: str | None = None
+
+
+class TaskListResponse(BaseModel):
+    items: list[Task]
+    total: int
+    page: int
+    page_size: int
+
+
 # In-memory user store used by the demo endpoints. The agent is free to
 # replace this with a proper data layer when the spec requires it.
 SEED_USERS: ClassVar[list[User]] = [
@@ -92,5 +140,28 @@ SEED_NOTES: ClassVar[list[Note]] = [
         user_id=2,
         title="Bob's bookmarks",
         body="A short list of things Bob is reading.",
+    ),
+]
+
+SEED_TASKS: list[Task] = [
+    Task(
+        id=str(uuid.uuid4()),
+        title="Set up CI/CD pipeline",
+        description="Configure GitHub Actions for automated testing and deployment.",
+        status=TaskStatus.in_progress,
+        priority=TaskPriority.high,
+    ),
+    Task(
+        id=str(uuid.uuid4()),
+        title="Write API documentation",
+        description="Document all endpoints using OpenAPI spec.",
+        status=TaskStatus.todo,
+        priority=TaskPriority.medium,
+    ),
+    Task(
+        id=str(uuid.uuid4()),
+        title="Review pull requests",
+        status=TaskStatus.todo,
+        priority=TaskPriority.low,
     ),
 ]
