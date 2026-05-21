@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, clearToken, getToken, type User } from "@/lib/api";
+import { SectionNav } from "@/components/section-nav";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -51,8 +52,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-svh bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-          <Link href="/app" className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-6 px-6 py-3">
+          <Link href="/app" className="flex shrink-0 items-center gap-2">
             <span className="flex size-6 items-center justify-center rounded-md bg-zinc-900 text-[11px] font-semibold text-white">
               P
             </span>
@@ -60,7 +61,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               pilot-app
             </span>
           </Link>
-          <div className="flex items-center gap-3">
+          <SectionNav />
+          <div className="flex shrink-0 items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-[12px] font-medium text-zinc-900">{user.name ?? user.email}</p>
               <p className="text-[11px] text-zinc-500">{user.email}</p>
