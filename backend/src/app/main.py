@@ -1,12 +1,14 @@
-"""FastAPI app for pilot-app — login + notes CRUD."""
+"""FastAPI app for pilot-app — login + notes CRUD + tasks CRUD."""
 
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import status as http_status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import (
@@ -16,7 +18,14 @@ from app.models import (
     NoteCreate,
     NoteUpdate,
     SEED_NOTES,
+    SEED_TASKS,
     SEED_USERS,
+    Task,
+    TaskCreate,
+    TaskListResponse,
+    TaskPriority,
+    TaskStatus,
+    TaskUpdate,
     User,
 )
 
@@ -36,6 +45,9 @@ app.add_middleware(
 _NOTES: dict[int, Note] = {n.id: n.model_copy() for n in SEED_NOTES}
 _NEXT_NOTE_ID = max(_NOTES.keys(), default=0) + 1
 _TOKENS: dict[str, int] = {}  # token → user_id
+_TASKS: dict[str, Task] = {t.id: t.model_copy() for t in SEED_TASKS}
+
+_PRIORITY_ORDER = {TaskPriority.low: 0, TaskPriority.medium: 1, TaskPriority.high: 2}
 
 
 def _utcnow() -> datetime:
@@ -59,18 +71,18 @@ def require_user(
     """Extract the bearer token from the Authorization header."""
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token"
+            status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token"
         )
     token = authorization.split(" ", 1)[1].strip()
     user_id = _TOKENS.get(token)
     if user_id is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+            status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
     user = next((u for u in SEED_USERS if u.id == user_id), None)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown user"
+            status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Unknown user"
         )
     return user
 
@@ -95,12 +107,12 @@ async def login(payload: LoginRequest) -> LoginResponse:
     user = next((u for u in SEED_USERS if u.email == payload.email), None)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+            status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
     return LoginResponse(token=_issue_token(user.id), user=user)
 
 
-@app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+@app.post("/api/auth/logout", status_code=http_status.HTTP_204_NO_CONTENT)
 async def logout(
     authorization: Annotated[str | None, Header()] = None,
 ) -> None:
@@ -124,7 +136,7 @@ async def list_notes(user: CurrentUser) -> list[Note]:
 @app.post(
     "/api/notes",
     response_model=Note,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
 )
 async def create_note(payload: NoteCreate, user: CurrentUser) -> Note:
     global _NEXT_NOTE_ID
@@ -145,7 +157,7 @@ async def get_note(note_id: int, user: CurrentUser) -> Note:
     note = _NOTES.get(note_id)
     if note is None or note.user_id != user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Note not found"
         )
     return note
 
@@ -157,7 +169,7 @@ async def update_note(
     note = _NOTES.get(note_id)
     if note is None or note.user_id != user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Note not found"
         )
     data = note.model_dump()
     for field in ("title", "body", "pinned"):
@@ -170,11 +182,99 @@ async def update_note(
     return updated
 
 
-@app.delete("/api/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/notes/{note_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_note(note_id: int, user: CurrentUser) -> None:
     note = _NOTES.get(note_id)
     if note is None or note.user_id != user.id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Note not found"
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Note not found"
         )
     _NOTES.pop(note_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Tasks routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/tasks", response_model=TaskListResponse)
+async def list_tasks(
+    user: CurrentUser,
+    status_filter: Annotated[TaskStatus | None, Query(alias="status")] = None,
+    priority_filter: Annotated[TaskPriority | None, Query(alias="priority")] = None,
+    sort_by: Literal["created_at", "priority"] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> TaskListResponse:
+    items = list(_TASKS.values())
+    if status_filter is not None:
+        items = [t for t in items if t.status == status_filter]
+    if priority_filter is not None:
+        items = [t for t in items if t.priority == priority_filter]
+    reverse = order == "desc"
+    if sort_by == "priority":
+        items.sort(key=lambda t: _PRIORITY_ORDER[t.priority], reverse=reverse)
+    else:
+        items.sort(key=lambda t: t.created_at, reverse=reverse)
+    total = len(items)
+    start = (page - 1) * page_size
+    return TaskListResponse(
+        items=items[start : start + page_size],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@app.post(
+    "/api/tasks",
+    response_model=Task,
+    status_code=http_status.HTTP_201_CREATED,
+)
+async def create_task(payload: TaskCreate, user: CurrentUser) -> Task:
+    task = Task(
+        id=str(uuid.uuid4()),
+        title=payload.title,
+        description=payload.description,
+        status=payload.status,
+        priority=payload.priority,
+        assignee_id=payload.assignee_id,
+    )
+    _TASKS[task.id] = task
+    return task
+
+
+@app.get("/api/tasks/{task_id}", response_model=Task)
+async def get_task(task_id: str, user: CurrentUser) -> Task:
+    task = _TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    return task
+
+
+@app.patch("/api/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: str, payload: TaskUpdate, user: CurrentUser) -> Task:
+    task = _TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    data = task.model_dump()
+    data.update(payload.model_dump(exclude_unset=True))
+    data["updated_at"] = _utcnow()
+    updated = Task.model_validate(data)
+    _TASKS[task_id] = updated
+    return updated
+
+
+@app.delete("/api/tasks/{task_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+async def delete_task(task_id: str, user: CurrentUser) -> None:
+    task = _TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    _TASKS.pop(task_id, None)

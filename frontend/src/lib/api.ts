@@ -1,5 +1,13 @@
 /** Thin browser-side wrapper around the pilot-app backend. */
 
+import type {
+  Task,
+  TaskCreatePayload,
+  TaskFilters,
+  TaskUpdatePayload,
+  TasksResponse,
+} from "@/types/task";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
 
 const TOKEN_KEY = "pilot_app.token";
@@ -98,4 +106,27 @@ export const api = {
     }),
   deleteNote: (id: number) =>
     request<void>(`/api/notes/${id}`, { method: "DELETE" }),
+
+  listTasks: (filters?: Partial<TaskFilters>, page = 1, pageSize = 20) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set("status", filters.status);
+    if (filters?.priority) params.set("priority", filters.priority);
+    if (filters?.sort_by) params.set("sort_by", filters.sort_by);
+    if (filters?.order) params.set("order", filters.order);
+    params.set("page", String(page));
+    params.set("page_size", String(pageSize));
+    const qs = params.toString();
+    return request<TasksResponse>(`/api/tasks${qs ? `?${qs}` : ""}`);
+  },
+
+  getTask: (id: string) => request<Task>(`/api/tasks/${id}`),
+
+  createTask: (payload: TaskCreatePayload) =>
+    request<Task>("/api/tasks", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateTask: (id: string, payload: TaskUpdatePayload) =>
+    request<Task>(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteTask: (id: string) =>
+    request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
 };
