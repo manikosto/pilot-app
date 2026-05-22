@@ -470,3 +470,207 @@ describe("Layout regression: color picker does not alter card dimensions", () =>
     expect(within(article).getByText("alpha")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Accessibility: aria-expanded on the palette toggle button
+// ---------------------------------------------------------------------------
+
+describe("Accessibility: aria-expanded reflects picker open/closed state", () => {
+  it("palette button has aria-expanded=false when picker is closed", () => {
+    render(<TaskCard task={makeTask()} />);
+    const btn = screen.getByLabelText("Pick card color");
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("palette button has aria-expanded=true after it is clicked open", () => {
+    render(<TaskCard task={makeTask()} />);
+    const btn = screen.getByLabelText("Pick card color");
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("palette button returns to aria-expanded=false after picker is closed", () => {
+    render(<TaskCard task={makeTask()} />);
+    const btn = screen.getByLabelText("Pick card color");
+    fireEvent.click(btn); // open
+    fireEvent.click(btn); // close
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Accessibility: aria-pressed on swatch buttons
+// ---------------------------------------------------------------------------
+
+describe("Accessibility: aria-pressed reflects currentColor on swatch buttons", () => {
+  it("swatch matching currentColor has aria-pressed=true", () => {
+    const blue = TASK_CARD_PALETTE.find((c) => c.id === "blue")!;
+    render(
+      <ColorPickerPopover
+        anchorEl={null}
+        currentColor={blue.hexValue}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(blue.label)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("swatch not matching currentColor has aria-pressed=false", () => {
+    const blue = TASK_CARD_PALETTE.find((c) => c.id === "blue")!;
+    const red = TASK_CARD_PALETTE.find((c) => c.id === "red")!;
+    render(
+      <ColorPickerPopover
+        anchorEl={null}
+        currentColor={blue.hexValue}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(red.label)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("all swatches have aria-pressed=false when currentColor is undefined", () => {
+    render(
+      <ColorPickerPopover
+        anchorEl={null}
+        currentColor={undefined}
+        onChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    const dialog = screen.getByRole("dialog");
+    for (const btn of within(dialog).getAllByRole("button")) {
+      expect(btn).toHaveAttribute("aria-pressed", "false");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation: arrow keys within ColorPickerPopover
+// ---------------------------------------------------------------------------
+
+describe("ColorPickerPopover: arrow key navigation between swatches", () => {
+  it("ArrowRight moves focus from first swatch to second", () => {
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={() => {}} onClose={() => {}} />
+    );
+    const buttons = within(screen.getByRole("dialog")).getAllByRole("button");
+    buttons[0].focus();
+    fireEvent.keyDown(buttons[0], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(buttons[1]);
+  });
+
+  it("ArrowRight from the last swatch wraps to the first", () => {
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={() => {}} onClose={() => {}} />
+    );
+    const buttons = within(screen.getByRole("dialog")).getAllByRole("button");
+    const last = buttons[buttons.length - 1];
+    last.focus();
+    fireEvent.keyDown(last, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(buttons[0]);
+  });
+
+  it("ArrowLeft from the first swatch wraps to the last", () => {
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={() => {}} onClose={() => {}} />
+    );
+    const buttons = within(screen.getByRole("dialog")).getAllByRole("button");
+    buttons[0].focus();
+    fireEvent.keyDown(buttons[0], { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(buttons[buttons.length - 1]);
+  });
+
+  it("ArrowDown moves focus 4 positions forward (one grid row)", () => {
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={() => {}} onClose={() => {}} />
+    );
+    const buttons = within(screen.getByRole("dialog")).getAllByRole("button");
+    buttons[0].focus();
+    fireEvent.keyDown(buttons[0], { key: "ArrowDown" });
+    // 8 swatches in a 4-col grid: row 0 = [0..3], row 1 = [4..7]
+    expect(document.activeElement).toBe(buttons[4]);
+  });
+
+  it("ArrowUp from the top row stays clamped at index 0", () => {
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={() => {}} onClose={() => {}} />
+    );
+    const buttons = within(screen.getByRole("dialog")).getAllByRole("button");
+    buttons[0].focus();
+    fireEvent.keyDown(buttons[0], { key: "ArrowUp" });
+    expect(document.activeElement).toBe(buttons[0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: swatch selection in the full TaskCard context
+// ---------------------------------------------------------------------------
+
+describe("Integration: swatch selection propagates through TaskCard", () => {
+  it("clicking a swatch calls onColorChange with the swatch hex value", () => {
+    const onColorChange = vi.fn();
+    render(<TaskCard task={makeTask()} onColorChange={onColorChange} />);
+    fireEvent.click(screen.getByLabelText("Pick card color"));
+    const red = TASK_CARD_PALETTE.find((c) => c.id === "red")!;
+    fireEvent.click(screen.getByLabelText(red.label));
+    expect(onColorChange).toHaveBeenCalledWith(red.hexValue);
+  });
+
+  it("popover is removed from the DOM after a swatch is selected", () => {
+    render(<TaskCard task={makeTask()} onColorChange={() => {}} />);
+    fireEvent.click(screen.getByLabelText("Pick card color"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(TASK_CARD_PALETTE[0].label));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("palette button is present even when onColorChange prop is omitted", () => {
+    render(<TaskCard task={makeTask()} />);
+    expect(screen.getByLabelText("Pick card color")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edge: default/white swatch resets to the neutral hex value
+// ---------------------------------------------------------------------------
+
+describe("Edge: default (white) swatch emits the correct hex value", () => {
+  it("clicking the Default swatch calls onChange with #ffffff", () => {
+    const onChange = vi.fn();
+    render(
+      <ColorPickerPopover anchorEl={null} currentColor={undefined} onChange={onChange} onClose={() => {}} />
+    );
+    const white = TASK_CARD_PALETTE.find((c) => c.id === "white")!;
+    fireEvent.click(screen.getByLabelText(white.label));
+    expect(onChange).toHaveBeenCalledWith("#ffffff");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edge: multiple cards carry independent, localStorage-keyed colors
+// ---------------------------------------------------------------------------
+
+describe("Edge: multiple task cards have independent colors", () => {
+  it("two tasks with different stored colors have different inline backgrounds", () => {
+    localStorage.setItem("task-color:1", "#FCA5A5");
+    localStorage.setItem("task-color:2", "#93C5FD");
+    const { container } = render(<TasksPage />);
+    const articles = container.querySelectorAll("article");
+    const first = (articles[0] as HTMLElement).style.backgroundColor;
+    const second = (articles[1] as HTMLElement).style.backgroundColor;
+    expect(first).not.toBe("");
+    expect(second).not.toBe("");
+    expect(first).not.toBe(second);
+  });
+
+  it("task with no stored color has no inline backgroundColor while a neighbour does", () => {
+    localStorage.setItem("task-color:1", "#FCA5A5");
+    // task id=2 has no stored color
+    const { container } = render(<TasksPage />);
+    const articles = container.querySelectorAll("article");
+    expect((articles[0] as HTMLElement).style.backgroundColor).not.toBe("");
+    expect((articles[1] as HTMLElement).style.backgroundColor).toBe("");
+  });
+});
