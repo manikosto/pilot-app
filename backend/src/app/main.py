@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import secrets
+import tomllib
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -19,6 +22,29 @@ from app.models import (
     SEED_USERS,
     User,
 )
+
+def _resolve_version() -> str:
+    try:
+        return importlib.metadata.version("pilot-app")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+
+    toml_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+    with open(toml_path, "rb") as f:
+        data = tomllib.load(f)
+
+    version = data.get("project", {}).get("version") or data.get("tool", {}).get(
+        "poetry", {}
+    ).get("version")
+    if not version:
+        raise RuntimeError(
+            "Could not resolve application version from pyproject.toml — "
+            "ensure [project].version or [tool.poetry].version is set."
+        )
+    return version
+
+
+APP_VERSION = _resolve_version()
 
 app = FastAPI(title="pilot-app", version="0.2.0")
 app.add_middleware(
@@ -86,6 +112,11 @@ CurrentUser = Annotated[User, Depends(require_user)]
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/version")
+async def get_version() -> dict[str, str]:
+    return {"version": APP_VERSION, "name": "pilot-app"}
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
