@@ -88,6 +88,11 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/ping")
+async def ping() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 async def login(payload: LoginRequest) -> LoginResponse:
     # Demo only: passwords aren't checked. Any user from SEED_USERS gets a
