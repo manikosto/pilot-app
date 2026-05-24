@@ -104,7 +104,9 @@ def test_resolve_version_raises_runtime_error_when_no_version_field():
     ):
         with patch("app.main.tomllib.load", return_value={}):
             # Act + Assert: must raise, not return None or ""
-            with pytest.raises(RuntimeError, match="Could not resolve application version"):
+            with pytest.raises(
+                RuntimeError, match="Could not resolve application version"
+            ):
                 _resolve_version()
 
 
@@ -117,5 +119,7 @@ def test_resolve_version_raises_runtime_error_when_both_sections_present_but_emp
     ):
         with patch("app.main.tomllib.load", return_value=empty_sections):
             # Act + Assert
-            with pytest.raises(RuntimeError, match="Could not resolve application version"):
+            with pytest.raises(
+                RuntimeError, match="Could not resolve application version"
+            ):
                 _resolve_version()

@@ -23,6 +23,7 @@ from app.models import (
     User,
 )
 
+
 def _resolve_version() -> str:
     try:
         return importlib.metadata.version("pilot-app")
@@ -182,9 +183,7 @@ async def get_note(note_id: int, user: CurrentUser) -> Note:
 
 
 @app.put("/api/notes/{note_id}", response_model=Note)
-async def update_note(
-    note_id: int, payload: NoteUpdate, user: CurrentUser
-) -> Note:
+async def update_note(note_id: int, payload: NoteUpdate, user: CurrentUser) -> Note:
     note = _NOTES.get(note_id)
     if note is None or note.user_id != user.id:
         raise HTTPException(
